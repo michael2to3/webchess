@@ -22,28 +22,80 @@ function asciiToUnicode(char) {
   }
   return symbol[pos];
 }
-function readFigure(pos) {
+function unicodeToAscii(char) {
+  const charPosition = ['K', 'Q', 'R', 'B', 'N', 'P', 'k', 'q', 'r', 'b', 'n', 'p'];
+  const symbol = [];
+  for (let i = 12; i < 24; i += 1) {
+    symbol.push(9800 + i);
+  }
+  const pos = symbol.indexOf(char.charCodeAt());
+  if (pos === -1) {
+    return char;
+  }
+  return charPosition[pos];
+}
+function snapshotBoard() {
   const board = document.querySelector('.board');
   const cells = board.children;
-  let shift = 0;
-  Array.from(pos).forEach((char, i) => {
-    if (char === '/') {
-      shift -= 1;
-    } else if (char === '8') {
-      shift += 7;
-    } else {
-      const figure = document.createElement('div');
-      figure.classList.add('figure');
-      figure.innerHTML = asciiToUnicode(char);
-      cells[i + shift].appendChild(figure);
+  const data = [];
+  for (let i = 0; i < 8; i += 1) {
+    data.push([]);
+    for (let j = 0; j < 8; j += 1) {
+      const cell = cells[i * 8 + j];
+      let figure = '';
+      if (cell.contains(cell.querySelector('.figure'))) {
+        figure = unicodeToAscii(cell.querySelector('.figure').textContent);
+      }
+      data[i].push(figure);
     }
+  }
+  return data;
+}
+
+function readFigure(rawdata) {
+  const board = document.querySelector('.board');
+  const cells = board.children;
+  const old = snapshotBoard();
+  const array = JSON.parse(rawdata);
+  if (JSON.stringify(old) === rawdata) {
+    return;
+  }
+  for (let i = 0; i < 8; i += 1) {
+    for (let j = 0; j < 8; j += 1) {
+      const cell = cells[i * 8 + j];
+      if (array[i][j] !== '') {
+        const figure = document.createElement('div');
+        figure.classList.add('figure');
+        figure.innerHTML = asciiToUnicode(array[i][j]);
+        cell.innerHTML = '';
+        cell.appendChild(figure);
+      } else {
+        cell.innerHTML = '';
+      }
+    }
+  }
+}
+function makeStep() {
+  const data = snapshotBoard();
+  const status = document.querySelector('.status');
+  fetch(`chess.php?action=step&step=${JSON.stringify(data)}`).then((res) => res.text()).then((res) => {
+    status.innerText = res;
   });
 }
 function createSession() {
   const status = document.querySelector('.status');
-  fetch('./chess.php?action=create').then((res) => res.text()).then((res) => {
-    if (res !== 'successful') {
-      status.innerHTML = 'Create session failed!';
+
+  const feh = 'rnbqkbnrpppppppp                                PPPPPPPPRNBQKBNR';
+  const data = [];
+  for (let i = 0; i < 8; i += 1) {
+    data.push([]);
+    for (let j = 0; j < 8; j += 1) {
+      data[i][j] = feh[i * 8 + j];
+    }
+  }
+  fetch(`./chess.php?action=step&step=${JSON.stringify(data)}`).then((res) => res.text()).then((res) => {
+    if (res !== '') {
+      status.innerText = res;
     }
   });
 }
@@ -77,11 +129,13 @@ function userInput() {
       const height = item.offsetHeight;
       const cell = getCellFromPosition(top + height / 2, left + width / 2);
       if (cell === null) {
-        status.innerHTML = "Not valid cell";
+        status.innerHTML = 'Not valid cell';
       } else {
+        cell.innerHTML = '';
         cell.appendChild(item);
       }
       item.classList.remove('drag');
+      makeStep();
     });
   });
   board.addEventListener('mousemove', (ev) => {
@@ -94,12 +148,16 @@ function userInput() {
     }
   });
 }
-
+function updateBoard() {
+  fetch('chess.php?action=get').then((res) => res.text()).then((res) => {
+    readFigure(res);
+    userInput();
+  });
+}
 function main() {
+  document.querySelector('.reset').onclick = createSession;
   initBoard();
-  readFigure('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR');
-  createSession();
-  userInput();
+  setInterval(updateBoard, 500);
 }
 
 window.onload = main;

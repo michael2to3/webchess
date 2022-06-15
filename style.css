@@ -35,3 +35,10 @@
 .drag {
   position: absolute;
 }
+.reset {
+  margin-top: 300px;
+  background: lightblue;
+  opacity: 0.6;
+  border: none;
+  border-radius: 25px;
+}
